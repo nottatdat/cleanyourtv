@@ -17,7 +17,7 @@
 # - Tailscale does not come back after a reboot by itself. Making it the always-on VPN fixes that:
 #   settings put secure always_on_vpn_app com.tailscale.ipn; settings put secure always_on_vpn_lockdown 0
 #   (takes effect at the next boot). With `"vpn_app": "com.tailscale.ipn"` the network pill shows a red
-#   "VPN off" badge while it is down and opens Tailscale when pressed.
+#   Tailscale badge while it is down (green while it is up) and opens Tailscale when pressed.
 # - The default Backdrop screensaver is disabled below; point the screensaver at
 #   com.android.dreams.basic/.Colors (or another dream) or it has nothing to show.
 #

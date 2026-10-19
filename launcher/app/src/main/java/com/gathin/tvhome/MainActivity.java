@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
@@ -92,6 +93,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView shamsiDate;
     private boolean shamsi;
     private String vpnApp;
+    /** Name shown in the network pill's VPN badge: the configured VPN app's label, e.g. "Tailscale". */
+    private String vpnLabel;
     private SpringAnimation springX, springY;
     private float glassTargetX, glassTargetY;
     // How far the grid has scrolled the glass. springY works without it, in grid content space, so a
@@ -104,6 +107,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** App of the last focused tile, so focus follows it when the app list changes. */
     private static String lastFocusedKey;
     private float density;
+    /** False when the system animator duration scale is 0 (Developer options / "Remove animations"): snap instead of animating. */
+    private boolean animations;
     /** Module cards (res/values/config.xml, module_cards): discovered on resume, shown only after the owner's Show. */
     private boolean moduleCards;
     /** hidden_apps as the adapter sees them (config.xml or a theme's config.json): a hidden app gets no card either. */
@@ -178,6 +183,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
+        animations = Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
         COLUMNS = cfg.columns;
@@ -210,6 +216,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             date.setPadding(0, (int) (4 * density), 0, 0);
         }
         vpnApp = cfg.vpnApp;
+        vpnLabel = getString(R.string.vpn);
+        if (!vpnApp.isEmpty()) {
+            try {
+                PackageManager pm = getPackageManager();
+                vpnLabel = pm.getApplicationLabel(pm.getApplicationInfo(vpnApp, 0)).toString();
+            } catch (PackageManager.NameNotFoundException ignored) {
+            }
+        }
         moduleCards = cfg.moduleCards;
         hiddenApps = new HashSet<>(cfg.hiddenApps);
 
@@ -218,9 +232,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.setHasFixedSize(true);
         grid.setItemAnimator(null);
         grid.addItemDecoration(new DockDecoration(COLUMNS, density));
-        grid.setLayoutAnimation(new LayoutAnimationController(
-                AnimationUtils.loadAnimation(this, R.anim.tile_enter), 0.06f));
-        adapter = new AppAdapter(this, this, COLUMNS, cfg);
+        if (animations) {
+            grid.setLayoutAnimation(new LayoutAnimationController(
+                    AnimationUtils.loadAnimation(this, R.anim.tile_enter), 0.06f));
+        }
+        adapter = new AppAdapter(this, this, COLUMNS, cfg, animations);
         grid.setAdapter(adapter);
 
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
@@ -378,7 +394,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ambient.setAlpha(0f);
         }
         reloadTiles();
-        if (animate) grid.scheduleLayoutAnimation();
+        if (animate && animations) grid.scheduleLayoutAnimation();
 
         if (restoreFocus) {
             // Follow the same app, or the nearest remaining slot when it was removed.
@@ -488,24 +504,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             springY.cancel();
             glass.setTranslationX(x);
             glass.setTranslationY(y);
-            glass.animate().alpha(1f).setDuration(180).start();
+            if (animations) glass.animate().alpha(1f).setDuration(180).start(); else glass.setAlpha(1f);
             glassShown = true;
-        } else {
+        } else if (animations) {
             springX.animateToFinalPosition(x);
             springY.animateToFinalPosition(y - glassScrollShift);
+        } else {
+            springX.cancel();
+            springY.cancel();
+            glass.setTranslationX(x);
+            glass.setTranslationY(y);
         }
         View item = (View) card.getParent();
         if (position < COLUMNS) {
             // Dock: park it at the bottom of the screen and show the top shelf for this app.
             int decoratedTop = item.getTop() - (int) (6 * density);
             int dy = decoratedTop - grid.getPaddingTop();
-            if (Math.abs(dy) > 1) grid.smoothScrollBy(0, dy);
+            if (Math.abs(dy) > 1) {
+                if (animations) grid.smoothScrollBy(0, dy); else grid.scrollBy(0, dy);
+            }
             showHero(position, r.top - dy);
         } else {
             hideHero();
             // Scroll just enough so the whole glass (not only the tile) is visible.
             Rect want = new Rect(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
-            grid.requestChildRectangleOnScreen(item, want, false);
+            grid.requestChildRectangleOnScreen(item, want, !animations);
         }
     }
 
@@ -521,22 +544,37 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             heroName.setText(label);
             heroName.setY(y);
             heroName.setTranslationX(0f);
-            heroName.animate().alpha(1f).setDuration(260).start();
-            setAmbient(color);
-            ambient.animate().alpha(1f).setDuration(600).start();
+            if (animations) {
+                heroName.animate().alpha(1f).setDuration(260).start();
+                setAmbient(color);
+                ambient.animate().alpha(1f).setDuration(600).start();
+            } else {
+                heroName.setAlpha(1f);
+                setAmbient(color);
+                ambient.setAlpha(1f);
+            }
             heroShown = true;
         } else if (changed) {
-            heroName.animate().alpha(0f).translationX(-12 * density).setDuration(120).withEndAction(() -> {
+            if (animations) {
+                heroName.animate().alpha(0f).translationX(-12 * density).setDuration(120).withEndAction(() -> {
+                    heroName.setText(label);
+                    heroName.setY(y);
+                    heroName.setTranslationX(12 * density);
+                    heroName.animate().alpha(1f).translationX(0f).setDuration(200).start();
+                }).start();
+                if (color != ambientColor) {
+                    ambient.animate().alpha(0.35f).setDuration(200).withEndAction(() -> {
+                        setAmbient(color);
+                        ambient.animate().alpha(1f).setDuration(500).start();
+                    }).start();
+                }
+            } else {
                 heroName.setText(label);
                 heroName.setY(y);
-                heroName.setTranslationX(12 * density);
-                heroName.animate().alpha(1f).translationX(0f).setDuration(200).start();
-            }).start();
-            if (color != ambientColor) {
-                ambient.animate().alpha(0.35f).setDuration(200).withEndAction(() -> {
-                    setAmbient(color);
-                    ambient.animate().alpha(1f).setDuration(500).start();
-                }).start();
+                heroName.setTranslationX(0f);
+                heroName.setAlpha(1f);
+                setAmbient(color);
+                ambient.setAlpha(1f);
             }
         } else {
             heroName.setY(y);
@@ -552,14 +590,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void hideHero() {
         if (!heroShown) return;
         heroShown = false;
-        heroName.animate().alpha(0f).setDuration(160).start();
-        ambient.animate().alpha(0f).setDuration(300).start();
+        if (animations) {
+            heroName.animate().alpha(0f).setDuration(160).start();
+            ambient.animate().alpha(0f).setDuration(300).start();
+        } else {
+            heroName.setAlpha(0f);
+            ambient.setAlpha(0f);
+        }
     }
 
     private void hideGlass() {
         if (!glassShown) return;
         glassShown = false;
-        glass.animate().alpha(0f).setDuration(160).start();
+        if (animations) glass.animate().alpha(0f).setDuration(160).start(); else glass.setAlpha(0f);
     }
 
     // ---- navigation ------------------------------------------------------------------------------
@@ -668,12 +711,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         } catch (Exception ignored) {
         }
-        // With a VPN app configured, a VPN that is down matters too: show a red "VPN off" capsule then.
+        // With a VPN app configured, a VPN that is down matters too: show a red capsule with the app's name then.
         boolean vpnDown = !vpn && online && !vpnApp.isEmpty();
         if (vpn || vpnDown) {
-            // Network name, then the green lock-and-VPN (or red "VPN off") capsule drawn in place of the word.
-            String badge = getString(vpn ? R.string.vpn : R.string.vpn_off);
-            VpnBadge span = new VpnBadge(vpn ? getDrawable(R.drawable.ic_lock) : null, density);
+            // Network name, then the VPN app's name in green while it is up and red while it is down.
+            String badge = vpnLabel;
+            VpnBadge span = new VpnBadge(vpn, density);
             // The pill has a maximum width and ellipsizes at the end, which would cut the badge off after
             // a long network name, so shorten the name to whatever room the badge leaves. The total paddings
             // include the Wi-Fi icon.

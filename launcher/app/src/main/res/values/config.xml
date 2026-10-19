@@ -9,20 +9,27 @@
 
     <!-- Apps pinned to the dock row at the bottom, in this order. Missing apps are skipped. -->
     <string-array name="dock_apps">
-        <item>com.netflix.ninja</item>
-        <item>com.amazon.amazonvideo.livingroom</item>
         <item>com.google.android.youtube.tv</item>
-        <item>in.startv.hotstar</item>
+        <item>com.netflix.ninja</item>
+        <item>org.jellyfin.androidtv</item>
+        <item>com.google.android.youtube.tvmusic</item>
+    </string-array>
+
+    <!-- Remote buttons that open an app, as KEYCODE=package (keycode name without the KEYCODE_ prefix). Needs
+         APP_KEY_SERVICE=1 at install. Google TV remotes: BUTTON_3 is YouTube, BUTTON_4 is Netflix, MACRO_1 is
+         the star button (Google TV Streamer remote). -->
+    <string-array name="app_buttons" translatable="false">
+        <item>BUTTON_3=com.google.android.youtube.tv</item>
+        <item>BUTTON_4=com.netflix.ninja</item>
+        <item>MACRO_1=org.jellyfin.androidtv</item>
     </string-array>
 
     <!-- Apps never shown as tiles (e.g. the Live TV app, which the Inputs menu already covers). -->
     <string-array name="hidden_apps">
-        <item>com.mediatek.wwtv.tvcenter</item>
-        <item>com.mitv.gallery</item>
     </string-array>
 
     <!-- The TV's Live TV / tuner app, offered at the end of the Inputs menu. Leave empty to omit. -->
-    <string name="live_tv_package" translatable="false">com.mediatek.wwtv.tvcenter</string>
+    <string name="live_tv_package" translatable="false"></string>
 
     <!-- Some TVs give their Live TV app no leanback entry point at all, so `live_tv_package` above
          resolves to nothing (TCL Android TV 9 on China-market sets is one). This action is then sent
@@ -44,9 +51,10 @@
          Gregorian date. -->
     <bool name="shamsi_date">false</bool>
     <!-- Optional VPN app the network pill opens (hold the pill for Wi-Fi settings), e.g. the package of the
-         VPN you use. Empty: the pill opens Wi-Fi settings. The green VPN badge shows for any VPN either way;
-         with an app set here, a red "VPN off" badge also shows while no VPN is up. -->
-    <string name="vpn_app" translatable="false"></string>
+         VPN you use. Empty: the pill opens Wi-Fi settings and shows no VPN badge. With an app set here, a
+         badge carrying its name follows the network name: green while a VPN is up, red while none is up. Any
+         VPN counts for the colour; the name is the configured app's label. -->
+    <string name="vpn_app" translatable="false">com.tailscale.ipn</string>
     <!-- Grid rows left visible under the dock on the home screen. 0 = dock sits at the very bottom. -->
     <integer name="rows_below_dock">0</integer>
 

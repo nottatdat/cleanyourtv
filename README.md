@@ -79,8 +79,9 @@ install any launcher at all; their lists say so in the header.
 
 Tested lists from contributors, one folder per model in [`examples/`](examples/):
 
-**Xiaomi** 8 · **TCL** 7 · **Sony** 2 · BenQ · CHiQ · Chromecast with Google TV · Hisense · Insignia Fire TV ·
-NVIDIA Shield · OnePlus · Philips · RCA · SANYO · Toshiba Fire TV · Stellamore and XGIMI projectors
+**Xiaomi** 8 · **TCL** 7 · **Sony** 2 · BenQ · CHiQ · Chromecast with Google TV · Google TV Streamer · Hisense ·
+Insignia Fire TV · NVIDIA Shield · OnePlus · Philips · RCA · SANYO · Toshiba Fire TV · Stellamore and XGIMI
+projectors
 
 <details>
 <summary><strong>The full list</strong></summary>
@@ -90,6 +91,7 @@ NVIDIA Shield · OnePlus · Philips · RCA · SANYO · Toshiba Fire TV · Stella
 | BenQ E55-735 (Changhong AI PONT, DVB96BQ) | Google TV 14 |
 | CHiQ AI PONT (DVB93CQ) | Android TV 11 |
 | Chromecast with Google TV 4K (sabrina) | Google TV 14 |
+| Google TV Streamer (2024, kirkwood) | Google TV 14 |
 | Hisense SmartTV 4K FFM (huangshan, MediaTek) | Android TV 10 |
 | Insignia 55" F30 4K Fire TV (NS-55F301NA25, AFTDCT31, duckie) | Fire OS 7 / Android 9 |
 | NVIDIA SHIELD TV Pro 2019 (P2897, mdarcy) | Android TV 11 |
@@ -167,13 +169,14 @@ AndroidX RecyclerView and nothing heavier. Built for sets with 1 GB of RAM: no b
 network, no background services. It needs JDK 17 and Android SDK platform 34 to build; on macOS,
 `brew install openjdk@17 android-commandlinetools` and `sdkmanager "platforms;android-34" "build-tools;34.0.0"`.
 
-- **Configure** in [`config.xml`](launcher/app/src/main/res/values/config.xml): dock order, hidden apps, the Live TV package, columns (tiles shrink from 5 up), rows under the dock, an optional VPN app for the network pill.
+- **Configure** in [`config.xml`](launcher/app/src/main/res/values/config.xml): dock order, hidden apps, the Live TV package, columns (tiles shrink from 5 up), rows under the dock, an optional VPN app for the network pill (its name shows green when a VPN is up and red when it is down).
 - **Themes** set the same keys plus a background colour and a wallpaper from a `config.json` pushed to the TV, no rebuild. Three ship in [`themes/`](themes/), documented there.
 - **Language** follows the TV: English, German, Spanish, Catalan, French, Russian, Simplified Chinese, Thai. Android 13+ can set it for the launcher alone: `tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales ca'`.
 - **Module cards** let any TV app declare its own tile (label, caption, glow). The launcher asks you once per app, Keep hidden by default, and remembers the answer for that app's signing key and card name. Hold OK on Settings to change your mind. How to make one: [`docs/modules.md`](docs/modules.md); the contract: [`docs/specs/card.md`](docs/specs/card.md).
 - **Clock screensaver**: a drifting clock over the glow, so nothing burns in. Pick "Clock" in the TV's screensaver settings, or over ADB:
   `tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'`
-- **Remote keys**: an optional accessibility service keeps the remote's Input button working on Google TV (`INPUT_KEY_SERVICE=1` at install), another fixes sticks whose Home key sends ALL_APPS (`HOME_KEY_SERVICE=1`).
+- **Remote keys**: an optional accessibility service keeps the remote's Input button working on Google TV (`INPUT_KEY_SERVICE=1` at install), another fixes sticks whose Home key sends ALL_APPS (`HOME_KEY_SERVICE=1`), and a third makes the YouTube, Netflix and star buttons open their apps once Google TV's home is gone (`APP_KEY_SERVICE=1`, mapping in `app_buttons`).
+- **Animation scale**: follows the TV's Developer options setting. At 0 the launcher snaps too: no glass spring, tile zoom or fades.
 - **Navigation** is deliberate: Up and Down move one row, the top buttons never fall through to tiles, the last focused app is remembered, and installing or removing an app refreshes the tiles while Home is open.
 
 ## Restoring your TV

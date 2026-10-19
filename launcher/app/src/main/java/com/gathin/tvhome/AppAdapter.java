@@ -112,15 +112,18 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     /** Never shown as tiles (res/values/config.xml, hidden_apps). */
     private final Set<String> hidden;
     private final boolean showHomeSettings;
+    /** False when the system animator duration scale is 0: focus snaps instead of scaling and fading. */
+    private final boolean animations;
     private final List<Entry> items = new ArrayList<>();
 
-    AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg) {
+    AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg, boolean animations) {
         this.ctx = ctx;
         this.listener = listener;
         this.dockSize = dockSize;
         this.favourites = cfg.dockApps;
         this.hidden = new HashSet<>(cfg.hiddenApps);
         this.showHomeSettings = cfg.showHomeSettingsShortcut;
+        this.animations = animations;
         // Tiles keep their identity across reload(), so a focused tile stays on its app instead of
         // its view being rebound to whatever app now sits in that slot.
         setHasStableIds(true);
@@ -195,7 +198,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         nameLp.width = w;
         nameLp.topMargin = h + Math.round(7 * density);
         name.setLayoutParams(nameLp);
-        return new Holder(v, listener);
+        return new Holder(v, listener, animations);
     }
 
     @Override
@@ -340,7 +343,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         final TextView label;
         final TextView name;
 
-        Holder(View v, TileListener listener) {
+        Holder(View v, TileListener listener, boolean animations) {
             super(v);
             card = v.findViewById(R.id.card);
             banner = v.findViewById(R.id.banner);
@@ -368,13 +371,20 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
 
             card.setOnFocusChangeListener((view, focused) -> {
                 float s = focused ? FOCUS_SCALE : 1.0f;
-                view.animate().scaleX(s).scaleY(s)
-                        .setDuration(focused ? 260 : 180)
-                        .setInterpolator(new OvershootInterpolator(focused ? 1.6f : 0f))
-                        .start();
-                name.animate().alpha(focused ? 1f : 0f)
-                        .translationY(focused ? density * 4f : -density * 6f)
-                        .setDuration(220).start();
+                if (animations) {
+                    view.animate().scaleX(s).scaleY(s)
+                            .setDuration(focused ? 260 : 180)
+                            .setInterpolator(new OvershootInterpolator(focused ? 1.6f : 0f))
+                            .start();
+                    name.animate().alpha(focused ? 1f : 0f)
+                            .translationY(focused ? density * 4f : -density * 6f)
+                            .setDuration(220).start();
+                } else {
+                    view.setScaleX(s);
+                    view.setScaleY(s);
+                    name.setAlpha(focused ? 1f : 0f);
+                    name.setTranslationY(focused ? density * 4f : -density * 6f);
+                }
                 int pos = getBindingAdapterPosition();
                 if (focused && listener != null && pos != RecyclerView.NO_POSITION) {
                     listener.onTileFocused(pos, view);
